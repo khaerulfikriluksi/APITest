@@ -26,10 +26,10 @@ app.get('/webhook', async (req, res) => {
   }
   
   const query = `
-      SELECT A.*, B.cost, C.url_getmessage, C.api_key, A.id
+      SELECT A.*, B.cost, C.*
       FROM tbl_order AS A
       LEFT JOIN tbl_application AS B ON B.application = A.application
-      JOIN tbl_config AS C ON C.config_id = A.config_id
+      JOIN tbl_config AS C
       WHERE A.order_status = 'Ongoing'
   `;
   
