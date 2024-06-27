@@ -46,6 +46,8 @@ app.get('/webhook', async (req, res) => {
                   if(responseData.status == "success") {
                     if (responseData.data.status == 3) {
                       await updateOrder('Done', 'Success', responseData.data.inbox, 'Unread', row.order_id);
+                      const url2 = `${row.url_cancel}?apikey=${row.api_key}&id=${row.order_id}&status=1`;
+                      await axios.get(url2, { timeout: 5000 });
                     } else if (responseData.data.status == 0) {
                       await updateOrder('Canceled', 'Timeout', '', 'Read', row.order_id);
                     } else if (responseData.data.status == 1) {
@@ -67,9 +69,69 @@ app.get('/webhook', async (req, res) => {
   }
 });
 
-app.get('/create-order', async (req, res) => {
-  username = req.query.username
-  application_id = req.query.application_id
+app.get('/cancel-order', async(req, res) => {
+  const order_id = req.query.order_id
+
+  const query = `
+      SELECT A.id as order_id,A.*, B.cost, C.*
+      FROM tbl_order AS A
+      LEFT JOIN tbl_application AS B ON B.application = A.application
+      JOIN tbl_config AS C
+      WHERE  A.id = '${order_id}' AND A.order_status = 'Ongoing'
+  `;
+  
+  try {
+      const connection = await mysql.createConnection(dbConfig);
+      const [results] = await connection.execute(query);
+      await connection.end();
+
+      if(results.length == 0) {
+        return res.status(200).json({
+          "status":"error",
+          "message":"Order tidak ditemukan"
+        });
+      }
+
+      const row = results[0]
+
+      const url = `${row.url_getmessage}?apikey=${row.api_key}&id=${row.order_id}`;
+        const response = await axios.get(url, { timeout: 5000 });
+        if (response.status === 200) {
+            const responseData = response.data;
+            if(responseData.status == "success") {
+              if (responseData.data.status == 3) {
+                return res.status(200).json({
+                  "status":"success",
+                  "message":"Order tidak dibatalkan, OTP sudah diterima"
+                });
+              } else {
+                const url2 = `${row.url_cancel}?apikey=${row.api_key}&id=${row.order_id}&status=0`;
+                await axios.get(url2, { timeout: 5000 });
+                return res.status(200).json({
+                  "status":"success",
+                  "message":"Order berhasil dibatalkan"
+                });
+              }
+            }                  
+        } else {
+          const url2 = `${row.url_cancel}?apikey=${row.api_key}&id=${row.order_id}&status=0`;
+          await axios.get(url2, { timeout: 5000 });
+          return res.status(200).json({
+            "status":"success",
+            "message":"Order berhasil dibatalkan"
+          });
+        }
+  } catch (error) {
+      console.error('Error executing query:', error);
+      return res.status(200).json({
+        "status":"error",
+        "message":"Order gagal, silahkan coba beberapa saat lagi."
+      });
+  }
+})
+
+app.post('/create-order', async (req, res) => {
+  const {username, application_id} = req.body
   
   const connection = await mysql.createConnection(dbConfig);
   const [resQ] = await connection.execute(`SELECT A.*,A.id as app_id,B.*,C.quota FROM tbl_application AS A JOIN tbl_config AS B JOIN tbl_customer AS C WHERE A.id='${application_id}'`);
@@ -191,18 +253,23 @@ app.get('/applications', async (req, res) => {
 });
 
 // Route 5
-app.put('/update-order', async (req, res) => {
-  const { data, id } = req.body;
-  const setClause = Object.keys(data).map(key => `${key} = ${mysql.escape(data[key])}`).join(', ');
-  const query = `UPDATE tbl_order SET ${setClause} WHERE id = ${mysql.escape(id)}`;
+app.put('/update-markread', async (req, res) => {
+  const id = req.body.id;
+  const query = `UPDATE tbl_order SET read_status = 'Read' WHERE id = '${id}' AND order_status = 'Done'`;
   
   try {
     const connection = await mysql.createConnection(dbConfig);
     const [results] = await connection.execute(query);
     await connection.end();
-    res.json({ success: true, results });
+    return res.status(200).json({
+      "status":"success",
+      "message":"Mark as read success"
+    });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return res.status(200).json({
+      "status":"error",
+      "message":"Mark as read failed, please try again later."
+    });
   }
 });
 
