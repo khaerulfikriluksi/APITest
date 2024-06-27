@@ -81,7 +81,6 @@ app.get('/webhook', async (req, res) => {
 
 app.get('/cancel-order', async(req, res) => {
   const order_id = req.query.order_id
-
   const query = `
       SELECT A.id as order_id,A.*, B.cost, C.*
       FROM tbl_order AS A
@@ -104,12 +103,15 @@ app.get('/cancel-order', async(req, res) => {
 
       const row = results[0]
 
+      console.log(`'${row.username}' canceling '${row.application}' with number '${row.number}'`)
+
       const url = `${row.url_getmessage}?apikey=${row.api_key}&id=${row.order_id}`;
         const response = await axios.get(url, { timeout: 5000 });
         if (response.status === 200) {
             const responseData = response.data;
             if(responseData.status == "success") {
               if (responseData.data.status == 3) {
+                console.log(`'${row.username}' canceling '${row.application}' with number '${row.number}' Success`)
                 return res.status(200).json({
                   "status":"success",
                   "message":"Order tidak dibatalkan, OTP sudah diterima"
@@ -117,6 +119,7 @@ app.get('/cancel-order', async(req, res) => {
               } else {
                 const url2 = `${row.url_cancel}?apikey=${row.api_key}&id=${row.order_id}&status=0`;
                 await axios.get(url2, { timeout: 5000 });
+                console.log(`'${row.username}' canceling '${row.application}' with number '${row.number}' Success`)
                 return res.status(200).json({
                   "status":"success",
                   "message":"Order berhasil dibatalkan"
@@ -126,6 +129,7 @@ app.get('/cancel-order', async(req, res) => {
         } else {
           const url2 = `${row.url_cancel}?apikey=${row.api_key}&id=${row.order_id}&status=0`;
           await axios.get(url2, { timeout: 5000 });
+          console.log(`'${row.username}' canceling '${row.application}' with number '${row.number}' Success`)
           return res.status(200).json({
             "status":"success",
             "message":"Order berhasil dibatalkan"
@@ -133,6 +137,7 @@ app.get('/cancel-order', async(req, res) => {
         }
   } catch (error) {
       console.error('Error executing query:', error);
+      console.log(`'${row.username}' canceling '${row.application}' with number '${row.number}' Failed`)
       return res.status(200).json({
         "status":"error",
         "message":"Order gagal, silahkan coba beberapa saat lagi."
@@ -171,6 +176,7 @@ app.post('/create-order', async (req, res) => {
         const responseData = response.data;
         if(responseData.status == "success") {
           try {
+            console.log(`'${username}' Order '${row.application}' with number '${responseData.number}'`)
             const query_insert = `INSERT INTO tbl_order (id, username, application, order_time, number, status, order_status, read_status) 
                           VALUES ('${responseData.id}','${username}', '${row.application}', '${currentDateTime}', '${responseData.number}', 'Waiting Sms', 'Ongoing', 'New')`;
             const connection = await mysql.createConnection(dbConfig);
@@ -185,6 +191,7 @@ app.post('/create-order', async (req, res) => {
               });
             }
           } catch (error) {
+            console.log(`'${username}' Order Failed`)
               console.error('Error executing query:', error);
               return res.status(200).json({
                 "status":"error",
@@ -193,6 +200,7 @@ app.post('/create-order', async (req, res) => {
           }
         } else {
           if(responseData.message == "saldo tidak mencukupi") {
+            console.log(`'${username}' Order Failed, out of balance`)
             return res.status(200).json({
               "status":"error",
               "message":"Order gagal, Stock kartu habis, silahkan hubungi CS terkait kendala ini."
@@ -202,6 +210,7 @@ app.post('/create-order', async (req, res) => {
           }
         }                 
     } else {
+      console.log(`'${username}' Order Failed, Respond server != 200`)
         console.error(`Failed GET request Webhook status code: ${response.status}`);
         return res.status(200).json({
           "status":"error",
@@ -209,6 +218,7 @@ app.post('/create-order', async (req, res) => {
         });
     } 
   } catch (error) {
+    console.log(`'${username}' Order Failed, Error Send GET ${error}`)
     console.error('Error Send GET:', error);
     return res.status(200).json({
       "status":"error",
