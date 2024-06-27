@@ -27,7 +27,7 @@ app.get('/webhook', async (req, res) => {
   }
   
   const query = `
-      SELECT A.*, B.cost, C.*
+      SELECT A.id as order_id,A.*, B.cost, C.*
       FROM tbl_order AS A
       LEFT JOIN tbl_application AS B ON B.application = A.application
       JOIN tbl_config AS C
@@ -37,18 +37,21 @@ app.get('/webhook', async (req, res) => {
   try {
       const connection = await mysql.createConnection(dbConfig);
       const [results] = await connection.execute(query);
-      
       await Promise.all(results.map(async (row) => {
           try {
-              const url = `${row.url_getmessage}?apikey=${row.api_key}&id=${row.id}`;
+              const url = `${row.url_getmessage}?apikey=${row.api_key}&id=${row.order_id}`;
               const response = await axios.get(url, { timeout: 5000 });
               if (response.status === 200) {
                   const responseData = response.data;
-                  if (responseData.status === "success" && responseData.data && responseData.data.status === 3) {
-                      await updateOrder('Done', 'Success', responseData.data.inbox, 'Unread', row.id);
-                  } else if (responseData.status === "success" && responseData.data && responseData.data.status === 0) {
-                      await updateOrder('Canceled', 'Timeout', '', 'Read', row.id);
-                  }
+                  if(responseData.status == "success") {
+                    if (responseData.data.status == 3) {
+                      await updateOrder('Done', 'Success', responseData.data.inbox, 'Unread', row.order_id);
+                    } else if (responseData.data.status == 0) {
+                      await updateOrder('Canceled', 'Timeout', '', 'Read', row.order_id);
+                    } else if (responseData.data.status == 1) {
+                      await updateOrder('Done', 'Success', responseData.data.inbox, 'Unread', row.order_id);
+                    }
+                  }                  
               } else {
                   console.error(`Failed GET request Webhook status code: ${response.status}`);
               }
@@ -69,7 +72,6 @@ const updateOrder = async (order_status, status, message, read_status, id) => {
   try {
       const connection = await mysql.createConnection(dbConfig);
       const [results] = await connection.execute(query, [order_status, status, message, read_status, id]);
-      await connection.end();
       return true;
   } catch (err) {
       console.error('Error updating order:', err);
