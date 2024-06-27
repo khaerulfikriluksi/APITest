@@ -20,7 +20,7 @@ const buildWhereClause = (params) => {
 };
 
 app.get('/webhook', async (req, res) => {
-  const api_key = req.query;
+  const api_key = req.query.api_key;
   if (stored_api_key !== api_key) {
       return res.status(401).json({ error: 'unauthorized' });
   }
