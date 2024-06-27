@@ -37,6 +37,7 @@ app.get('/webhook', async (req, res) => {
   try {
       const connection = await mysql.createConnection(dbConfig);
       const [results] = await connection.execute(query);
+      const affected = 0
       await Promise.all(results.map(async (row) => {
           try {
               const url = `${row.url_getmessage}?apikey=${row.api_key}&id=${row.order_id}`;
@@ -45,13 +46,13 @@ app.get('/webhook', async (req, res) => {
                   const responseData = response.data;
                   if(responseData.status == "success") {
                     if (responseData.data.status == 3) {
-                      await updateOrder('Done', 'Success', responseData.data.inbox, 'Unread', row.order_id);
+                      affected = await updateOrder('Done', 'Success', responseData.data.inbox, 'Unread', row.order_id);
                       const url2 = `${row.url_cancel}?apikey=${row.api_key}&id=${row.order_id}&status=1`;
                       await axios.get(url2, { timeout: 5000 });
                     } else if (responseData.data.status == 0) {
-                      await updateOrder('Canceled', 'Timeout', '', 'Read', row.order_id);
+                      affected = await updateOrder('Canceled', 'Timeout', '', 'Read', row.order_id);
                     } else if (responseData.data.status == 1) {
-                      await updateOrder('Done', 'Success', responseData.data.inbox, 'Unread', row.order_id);
+                      affected = await updateOrder('Done', 'Success', responseData.data.inbox, 'Unread', row.order_id);
                     }
                   }                  
               } else {
@@ -61,11 +62,19 @@ app.get('/webhook', async (req, res) => {
               console.error(`Error making GET request Webhook:`, error.message);
           }
       }));
-      await connection.end();
-      res.json({ message: 'Query executed successfully' });
+    await connection.end();
+    return res.status(200).json({
+      "status":"success",
+      "data":affected,
+      "message":"Webhook executed successfully"
+    });
   } catch (error) {
       console.error('Error executing query:', error);
-      res.status(500).json({ error: 'Internal server error' });
+      return res.status(200).json({
+        "status":"error",
+        "data":0,
+        "message":"Webhook executed failed"
+      });
   }
 });
 
@@ -199,7 +208,7 @@ const updateOrder = async (order_status, status, message, read_status, id) => {
       const connection = await mysql.createConnection(dbConfig);
       const [results] = await connection.execute(query, [order_status, status, message, read_status, id]);
       await connection.end();
-      return true;
+      return results.affectedRows;
   } catch (err) {
       console.error('Error updating order:', err);
       throw false;
