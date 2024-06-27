@@ -12,9 +12,68 @@ const dbConfig = {
   database: 'u357102271_OTP'
 };
 
+const stored_api_key = 'FikriLuksi321@@@'
+
 // Helper function to build WHERE clause
 const buildWhereClause = (params) => {
   return Object.keys(params).map(key => `${key} = ${mysql.escape(params[key])}`).join(' AND ');
+};
+
+app.get('/webhook', async (req, res) => {
+  const api_key = req.body.api_key;
+  if (stored_api_key !== api_key) {
+      return res.status(401).json({ error: 'unauthorized' });
+  }
+  
+  const query = `
+      SELECT A.*, B.cost, C.url_getmessage, C.api_key, A.id
+      FROM tbl_order AS A
+      LEFT JOIN tbl_application AS B ON B.application = A.application
+      JOIN tbl_config AS C ON C.config_id = A.config_id
+      WHERE A.order_status = 'Ongoing'
+  `;
+  
+  try {
+      const connection = await mysql.createConnection(dbConfig);
+      const [results] = await connection.execute(query);
+      
+      await Promise.all(results.map(async (row) => {
+          try {
+              const url = `${row.url_getmessage}?apikey=${row.api_key}&id=${row.id}`;
+              const response = await axios.get(url, { timeout: 5000 });
+              if (response.status === 200) {
+                  const responseData = response.data;
+                  if (responseData.status === "success" && responseData.data && responseData.data.status === 3) {
+                      await updateOrder('Done', 'Success', responseData.data.inbox, 'Unread', row.id);
+                  } else if (responseData.status === "success" && responseData.data && responseData.data.status === 0) {
+                      await updateOrder('Canceled', 'Timeout', '', 'Read', row.id);
+                  }
+              } else {
+                  console.error(`Failed GET request Webhook status code: ${response.status}`);
+              }
+          } catch (error) {
+              console.error(`Error making GET request Webhook:`, error.message);
+          }
+      }));
+      await connection.end();
+      res.json({ message: 'Query executed successfully' });
+  } catch (error) {
+      console.error('Error executing query:', error);
+      res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+const updateOrder = async (order_status, status, message, read_status, id) => {
+  const query = `UPDATE tbl_order SET order_status = ?, status = ?, message = ?, read_status = ? WHERE id = ?`;
+  try {
+      const connection = await mysql.createConnection(dbConfig);
+      const [results] = await connection.execute(query, [order_status, status, message, read_status, id]);
+      await connection.end();
+      return true;
+  } catch (err) {
+      console.error('Error updating order:', err);
+      throw false;
+  }
 };
 
 // Route 1
@@ -115,3 +174,4 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
