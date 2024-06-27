@@ -43,7 +43,7 @@ app.get('/webhook', async (req, res) => {
           try {
               const url = `${row.url_getmessage}?apikey=${row.api_key}&id=${row.order_id}`;
               const response = await axios.get(url, { timeout: 5000 });
-              if (response.status === 200) {
+              if (response.status == 200) {
                   const responseData = response.data;
                   if(responseData.status == "success") {
                     if (responseData.data.status == 3) {
@@ -162,7 +162,7 @@ app.post('/create-order', async (req, res) => {
     });
   }
 
-  const currentDateTime = new Date().toISOString().replace('T', ' ').substring(0, 19);
+  const currentDateTime = new Date(new Date().getTime() + (7 * 60 * 60 * 1000)).toISOString().replace('T', ' ').substring(0, 19);
 
   //SendAPI timeout 5 detik
   try {
