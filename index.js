@@ -67,11 +67,76 @@ app.get('/webhook', async (req, res) => {
   }
 });
 
+app.get('/create-order', async (req, res) => {
+  username = req.query.username
+  application_id = req.query.application_id
+  
+  const connection = await mysql.createConnection(dbConfig);
+  const [resQ] = await connection.execute(`SELECT A.*,A.id as app_id,B.*,C.quota FROM tbl_application AS A JOIN tbl_config AS B JOIN tbl_customer AS C WHERE A.id='${application_id}'`);
+  await connection.end();
+  if (resQ.length == 0) {
+    return res.status(404).json({ error: 'Application not found' });
+  }
+
+  const row = resQ[0]
+
+  if (row.quota < row.cost) {
+    return res.status(200).json({
+      "status":"error",
+      "message":"Order gagal, silahkan coba beberapa saat lagi."
+    });
+  }
+
+  const response = await axios.get(`${row.url_order}?apikey=${row.api_key}&service=${application_id}&operator=${row.operator}&country=${row.country_id}`, { timeout: 5000 });
+    if (response.status === 200) {
+        const responseData = response.data;
+        if(responseData.status == "success") {
+          try {
+            const query_insert = `INSERT INTO tbl_order (id, username, application, order_time, number, status, order_status, read_status) 
+                          VALUES ('${responseData.id}','${username}', '${row.application}', DATE_FORMAT(CONVERT_TZ(NOW(), 'SYSTEM', '+07:00'), '%Y-%m-%d %H:%i:%s'), '${responseData.number}', 'Waiting Sms', 'Ongoing', 'New')`;
+            const connection = await mysql.createConnection(dbConfig);
+            const insert_status = await connection.execute(query_insert);
+            await connection.end();
+            if(insert_status) {              
+              return response
+            } else {
+              return res.status(200).json({
+                "status":"error",
+                "message":"Order gagal, silahkan coba beberapa saat lagi."
+              });
+            }
+          } catch (error) {
+              console.error('Error executing query:', error);
+              return res.status(200).json({
+                "status":"error",
+                "message":"Order gagal, silahkan coba beberapa saat lagi."
+              });
+          }
+        } else {
+          if(responseData.message == "saldo tidak mencukupi") {
+            return res.status(200).json({
+              "status":"error",
+              "message":"Order gagal, Stock kartu habis, silahkan hubungi CS terkait kendala ini."
+            });
+          } else {
+            return response;
+          }
+        }                 
+    } else {
+        console.error(`Failed GET request Webhook status code: ${response.status}`);
+        return res.status(200).json({
+          "status":"error",
+          "message":"Order gagal, silahkan coba beberapa saat lagi."
+        });
+    }  
+});
+
 const updateOrder = async (order_status, status, message, read_status, id) => {
   const query = `UPDATE tbl_order SET order_status = ?, status = ?, message = ?, read_status = ? WHERE id = ?`;
   try {
       const connection = await mysql.createConnection(dbConfig);
       const [results] = await connection.execute(query, [order_status, status, message, read_status, id]);
+      await connection.end();
       return true;
   } catch (err) {
       console.error('Error updating order:', err);
@@ -80,7 +145,7 @@ const updateOrder = async (order_status, status, message, read_status, id) => {
 };
 
 // Route 1
-app.get('/orders', async (req, res) => {
+app.get('/show-orders', async (req, res) => {
   const params = req.query;
   const whereClause = buildWhereClause(params);
   const query = `SELECT A.*, B.cost, C.email FROM tbl_order AS A LEFT JOIN tbl_application AS B ON B.application = A.application LEFT JOIN tbl_customer AS C ON C.username = A.username WHERE ${whereClause}`;
@@ -125,24 +190,8 @@ app.get('/applications', async (req, res) => {
   }
 });
 
-// Route 4
-app.post('/order', async (req, res) => {
-  const { id, username, application, order_time, number, status, order_status, read_status } = req.body;
-  const query = 'INSERT INTO tbl_order (id, username, application, order_time, number, status, order_status, read_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
-  const values = [id, username, application, order_time, number, status, order_status, read_status];
-  
-  try {
-    const connection = await mysql.createConnection(dbConfig);
-    const [results] = await connection.execute(query, values);
-    await connection.end();
-    res.json({ success: true, results });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 // Route 5
-app.put('/order', async (req, res) => {
+app.put('/update-order', async (req, res) => {
   const { data, id } = req.body;
   const setClause = Object.keys(data).map(key => `${key} = ${mysql.escape(data[key])}`).join(', ');
   const query = `UPDATE tbl_order SET ${setClause} WHERE id = ${mysql.escape(id)}`;
@@ -158,7 +207,7 @@ app.put('/order', async (req, res) => {
 });
 
 // Route 6
-app.post('/customer', async (req, res) => {
+app.post('/insert-customer', async (req, res) => {
   const { username, password, quota, email } = req.body;
   const query = 'INSERT INTO tbl_customer (username, password, quota, email) VALUES (?, ?, ?, ?)';
   const values = [username, password, quota, email];
