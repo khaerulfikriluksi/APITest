@@ -5,6 +5,7 @@ const axios = require('axios');
 
 const app = express();
 app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
 const dbConfig = {
   host: '153.92.15.3',
@@ -140,13 +141,16 @@ app.get('/cancel-order', async(req, res) => {
 })
 
 app.post('/create-order', async (req, res) => {
-  const {username, application_id} = req.body
-  
+  const { application_id, username } = req.body;
+
   const connection = await mysql.createConnection(dbConfig);
   const [resQ] = await connection.execute(`SELECT A.*,A.id as app_id,B.*,C.quota FROM tbl_application AS A JOIN tbl_config AS B JOIN tbl_customer AS C WHERE A.id='${application_id}'`);
   await connection.end();
   if (resQ.length == 0) {
-    return res.status(404).json({ error: 'Application not found' });
+    return res.status(200).json({
+      "status":"error",
+      "message":"Application not found"
+    });
   }
 
   const row = resQ[0]
@@ -158,18 +162,22 @@ app.post('/create-order', async (req, res) => {
     });
   }
 
-  const response = await axios.get(`${row.url_order}?apikey=${row.api_key}&service=${application_id}&operator=${row.operator}&country=${row.country_id}`, { timeout: 5000 });
+  const currentDateTime = new Date().toISOString().replace('T', ' ').substring(0, 19);
+
+  //SendAPI timeout 5 detik
+  try {
+    const response = await axios.get(`${row.url_order}?apikey=${row.api_key}&service=${application_id}&operator=${row.operator}&country=${row.country_id}`, {timeout: 10000});
     if (response.status === 200) {
         const responseData = response.data;
         if(responseData.status == "success") {
           try {
             const query_insert = `INSERT INTO tbl_order (id, username, application, order_time, number, status, order_status, read_status) 
-                          VALUES ('${responseData.id}','${username}', '${row.application}', DATE_FORMAT(CONVERT_TZ(NOW(), 'SYSTEM', '+07:00'), '%Y-%m-%d %H:%i:%s'), '${responseData.number}', 'Waiting Sms', 'Ongoing', 'New')`;
+                          VALUES ('${responseData.id}','${username}', '${row.application}', '${currentDateTime}', '${responseData.number}', 'Waiting Sms', 'Ongoing', 'New')`;
             const connection = await mysql.createConnection(dbConfig);
             const insert_status = await connection.execute(query_insert);
-            await connection.end();
-            if(insert_status) {              
-              return response
+            await connection.end();  
+            if(insert_status) {            
+              return res.status(200).json(responseData)
             } else {
               return res.status(200).json({
                 "status":"error",
@@ -190,7 +198,7 @@ app.post('/create-order', async (req, res) => {
               "message":"Order gagal, Stock kartu habis, silahkan hubungi CS terkait kendala ini."
             });
           } else {
-            return response;
+            return res.status(200).json(responseData)
           }
         }                 
     } else {
@@ -199,7 +207,14 @@ app.post('/create-order', async (req, res) => {
           "status":"error",
           "message":"Order gagal, silahkan coba beberapa saat lagi."
         });
-    }  
+    } 
+  } catch (error) {
+    console.error('Error Send GET:', error);
+    return res.status(200).json({
+      "status":"error",
+      "message":"Order gagal, silahkan coba beberapa saat lagi."
+    });
+  }
 });
 
 const updateOrder = async (order_status, status, message, read_status, id) => {
