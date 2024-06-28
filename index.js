@@ -331,9 +331,15 @@ app.post('/insert-customer', async (req, res) => {
     const connection = await pool.getConnection();
     const [results] = await connection.execute(query, values);
     connection.release();
-    res.json({ success: true, results });
+    return res.status(200).json({
+      "status":"success",
+      "message":"Register success"
+    });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return res.status(200).json({
+      "status":"error",
+      "message":"Register failed"
+    });
   }
 });
 
