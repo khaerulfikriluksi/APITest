@@ -37,7 +37,7 @@ app.get('/webhook', async (req, res) => {
       FROM tbl_order AS A
       LEFT JOIN tbl_application AS B ON B.application = A.application
       JOIN tbl_config AS C
-      WHERE A.order_status = 'Ongoing'
+      WHERE A.order_status = 'Ongoing' ORDER BY A.id ASC
   `;
   
   try {
@@ -258,7 +258,7 @@ const updateOrder = async (order_status, status, message, read_status, id) => {
 app.get('/show-orders', async (req, res) => {
   const params = req.query;
   const whereClause = buildWhereClause(params);
-  const query = `SELECT A.*, B.cost, C.email FROM tbl_order AS A LEFT JOIN tbl_application AS B ON B.application = A.application LEFT JOIN tbl_customer AS C ON C.username = A.username WHERE ${whereClause}`;
+  const query = `SELECT A.*, B.cost, C.email FROM tbl_order AS A LEFT JOIN tbl_application AS B ON B.application = A.application LEFT JOIN tbl_customer AS C ON C.username = A.username WHERE ${whereClause} ORDER BY A.id DESC`;
   
   try {
     const connection = await pool.getConnection();
