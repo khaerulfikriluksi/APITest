@@ -1,0 +1,8 @@
+mysql-connector-python==8.4.0
+pytz==2024.1
+aiohttp==3.9.5
+python-telegram-bot==21.2
+beautifulsoup4==4.12.3
+html2image==2.0.4.3
+nest-asyncio==1.6.0
+bs4==0.0.2
