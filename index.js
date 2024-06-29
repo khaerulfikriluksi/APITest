@@ -3,6 +3,22 @@ const bodyParser = require('body-parser');
 const mysql = require('mysql2/promise');
 const axios = require('axios');
 
+const { spawn } = require('child_process');
+
+const pythonProcess = spawn('python', ['bot.py']);
+
+pythonProcess.stdout.on('data', (data) => {
+    console.log(`stdout: ${data}`);
+});
+
+pythonProcess.stderr.on('data', (data) => {
+    console.error(`stderr: ${data}`);
+});
+
+pythonProcess.on('close', (code) => {
+    console.log(`child process exited with code ${code}`);
+});
+
 const app = express();
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -309,10 +325,17 @@ app.put('/update-markread', async (req, res) => {
     const connection = await pool.getConnection();
     const [results] = await connection.execute(query);
     connection.release();
-    return res.status(200).json({
-      "status":"success",
-      "message":"Mark as read success"
-    });
+    if(results) {
+      return res.status(200).json({
+        "status":"success",
+        "message":"Mark as read success"
+      });  
+    } else {
+      return res.status(200).json({
+        "status":"error",
+        "message":"Mark as read failed, please try again later."
+      });
+    }    
   } catch (err) {
     return res.status(200).json({
       "status":"error",
@@ -333,12 +356,12 @@ app.post('/insert-customer', async (req, res) => {
     connection.release();
     return res.status(200).json({
       "status":"success",
-      "message":"Register success"
+      "message":"Mark as read success"
     });
   } catch (err) {
     return res.status(200).json({
       "status":"error",
-      "message":"Register failed"
+      "message":"Insert customer failed, please try again later."
     });
   }
 });
