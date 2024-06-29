@@ -5,7 +5,7 @@ const axios = require('axios');
 
 const { spawn } = require('child_process');
 
-const pythonProcess = spawn('python', ['bot.py']);
+const pythonProcess = spawn('python3', ['bot.py']);
 
 pythonProcess.stdout.on('data', (data) => {
     console.log(`stdout: ${data}`);
