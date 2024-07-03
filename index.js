@@ -7,17 +7,17 @@ const axios = require('axios');
 
 //const pythonProcess = spawn('python3', ['bot.py']);
 
-pythonProcess.stdout.on('data', (data) => {
-    console.log(`stdout: ${data}`);
-});
+// pythonProcess.stdout.on('data', (data) => {
+//     console.log(`stdout: ${data}`);
+// });
 
-pythonProcess.stderr.on('data', (data) => {
-    console.error(`stderr: ${data}`);
-});
+// pythonProcess.stderr.on('data', (data) => {
+//     console.error(`stderr: ${data}`);
+// });
 
-pythonProcess.on('close', (code) => {
-    console.log(`child process exited with code ${code}`);
-});
+// pythonProcess.on('close', (code) => {
+//     console.log(`child process exited with code ${code}`);
+// });
 
 const app = express();
 app.use(bodyParser.json());
