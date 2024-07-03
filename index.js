@@ -266,7 +266,7 @@ const updateOrder = async (order_status, status, message, read_status, id) => {
       return results.affectedRows;
   } catch (err) {
       console.error('Error updating order:', err);
-      throw false;
+      return 0
   }
 };
 
