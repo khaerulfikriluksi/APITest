@@ -159,7 +159,7 @@ app.get('/cancel-order', async(req, res) => {
         }
   } catch (error) {
       console.error('Error executing query:', error);
-      console.log(`'${row.username}' canceling '${row.application}' with number '${row.number}' Failed`);
+      // console.log(`'${row.username}' canceling '${row.application}' with number '${row.number}' Failed`);
       return res.status(200).json({
         "status":"error",
         "message":"Order gagal, silahkan coba beberapa saat lagi."
