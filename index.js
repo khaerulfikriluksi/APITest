@@ -347,7 +347,7 @@ app.put('/update-markread', async (req, res) => {
 // Route 6
 app.post('/insert-customer', async (req, res) => {
   const { username, password, quota, email } = req.body;
-  const query = 'INSERT INTO tbl_customer (username, password, quota, email) VALUES (?, ?, ?, ?)';
+  const query = 'INSERT IGNORE INTO tbl_customer (username, password, quota, email) VALUES (?, ?, ?, ?)';
   const values = [username, password, quota, email];
   
   try {
@@ -356,13 +356,57 @@ app.post('/insert-customer', async (req, res) => {
     connection.release();
     return res.status(200).json({
       "status":"success",
-      "message":"Mark as read success"
+      "message":"Insert success"
     });
   } catch (err) {
     return res.status(200).json({
       "status":"error",
       "message":"Insert customer failed, please try again later."
     });
+  }
+});
+
+// Route 7
+app.put('/update-customer', async (req, res) => {
+  const { username, password, quota } = req.body;
+  const query = 'UPDATE tbl_customer SET password = ?, quota = ? WHERE username = ?';
+  const values = [password, quota, username];
+  
+  try {
+    const connection = await pool.getConnection();
+    const [results] = await connection.execute(query, values);
+    connection.release();
+    
+    // Check if any rows were affected (i.e., updated)
+    if (results.affectedRows === 0) {
+      return res.status(200).json({
+        "status": "error",
+        "message": "Customer not found"
+      });
+    }
+    return res.status(200).json({
+      "status":"success",
+      "message":"Update success"
+    });
+  } catch (err) {
+    return res.status(200).json({
+      "status":"error",
+      "message":"Update customer failed, please try again later."
+    });
+  }
+});
+
+//Route 8
+app.get('/all-customer', async (req, res) => {
+  const query = 'SELECT * FROM tbl_customer';
+  
+  try {
+    const connection = await pool.getConnection();
+    const [results] = await connection.execute(query);
+    connection.release();
+    res.json(results);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
