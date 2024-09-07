@@ -410,6 +410,37 @@ app.get('/all-customer', async (req, res) => {
   }
 });
 
+//Route 9
+app.delete('/delete-customer', async (req, res) => {
+  const { username } = req.body;
+  const query = 'DELETE FROM tbl_customer WHERE username = ?';
+  const values = [username];
+  
+  try {
+    const connection = await pool.getConnection();
+    const [results] = await connection.execute(query, values);
+    connection.release();
+    
+    // Check if any rows were affected (i.e., deleted)
+    if (results.affectedRows === 0) {
+      return res.status(200).json({
+        "status": "error",
+        "message": "Customer not found"
+      });
+    }
+    return res.status(200).json({
+      "status": "success",
+      "message": "Delete success"
+    });
+  } catch (err) {
+    return res.status(200).json({
+      "status": "error",
+      "message": "Delete customer failed, please try again later."
+    });
+  }
+});
+
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
